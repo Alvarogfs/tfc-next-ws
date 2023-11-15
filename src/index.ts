@@ -101,24 +101,31 @@ io.on("connection", (socket) => {
     console.log("authenticate", data);
     socket.broadcast.emit("userConnected", data);
   });
+
+
   socket.on("createRoom", (user: User) => {
     if (userInRoom(user.id) !== -1) return;
     console.log("createroom");
+    const roomId = crypto.randomUUID()
     rooms.push({
-      id: crypto.randomUUID(),
+      id: roomId,
       users: [{...user}],
     });
-    io.emit("roomCreated");
+    socket.broadcast.emit("roomCreated");
+    socket.emit("roomCreatedSelf", roomId)
   });
-  socket.on("joinRoom", (roomId) => {
+
+
+  socket.on("joinRoom", (roomId: string, user: User) => {
     const room = rooms.find((room) => room.id === roomId);
     if (room && room.users.length < 2) {
       socket.join(roomId);
-      // if (!userInRoom(socket.handshake.query.user.id as string)) {
-      //   room.users.push(socket.handshake.query.user)
-      // }
+      room.users.push(user)
+      socket.broadcast.emit("joinedRoom")
     }
   });
+
+
   console.log("a user connected");
   console.log("connections", io.engine.clientsCount);
 
@@ -139,4 +146,14 @@ app.get("/", (req, res) => {
 
 app.get("/rooms", (req, res) => {
   res.json(rooms);
+});
+
+app.get("/rooms/:id", (req, res) => {
+  const room = rooms.find((room) => room.id === req.params.id);
+  console.log(rooms)
+  if(!room){
+    res.status(404)
+    return res.send("Not found")
+  }
+  res.json(room)
 });
