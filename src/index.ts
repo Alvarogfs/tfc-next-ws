@@ -25,7 +25,6 @@ const userInRoom = (userId?: string) => {
 const users: User[] = [];
 
 function removeUserAndDropRoom(userId: string): void {
-  console.log(userId);
   const index = R.pipe(
     rooms,
     R.findIndex((room) => room.users.some((user) => user.id === userId))
@@ -124,8 +123,6 @@ io.on("connection", (socket) => {
       socket.broadcast.emit("joinedRoom")
     }
   });
-
-
   console.log("a user connected");
   console.log("connections", io.engine.clientsCount);
 
@@ -135,7 +132,16 @@ io.on("connection", (socket) => {
     console.log("user disconnected");
     socket.broadcast.emit("userDisconnected")
   });
+
+  socket.on("exit", (userId: string) => {
+    const user = users.find((user) => user.socketIds?.has(socket.id));
+    if (user) removeUserAndDropRoom(user?.id);
+    console.log("user exit");
+    io.emit("userExit", userId)
+  });
 });
+
+
 
 app.get("/", (req, res) => {
   res.json({
@@ -150,7 +156,6 @@ app.get("/rooms", (req, res) => {
 
 app.get("/rooms/:id", (req, res) => {
   const room = rooms.find((room) => room.id === req.params.id);
-  console.log(rooms)
   if(!room){
     res.status(404)
     return res.send("Not found")
