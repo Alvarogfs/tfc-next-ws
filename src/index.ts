@@ -24,13 +24,14 @@ const userInRoom = (userId?: string) => {
 
 const users: User[] = [];
 
-function removeUserAndDropRoom(userId: string): void {
+function removeUserAndDropRoom(userId: string): string {
   const index = R.pipe(
     rooms,
     R.findIndex((room) => room.users.some((user) => user.id === userId))
   );
-
+    let roomId = ""
   if (index !== -1 && rooms[index]?.users) {
+    roomId = rooms[index].id
     rooms[index].users = R.pipe(
       rooms[index].users,
       R.filter((user) => user.id !== userId)
@@ -45,6 +46,7 @@ function removeUserAndDropRoom(userId: string): void {
   } else {
     console.log(`User ${userId} not found in any room.`);
   }
+  return roomId
 }
 
 const app = express();
@@ -108,7 +110,7 @@ io.on("connection", (socket) => {
     const roomId = crypto.randomUUID()
     rooms.push({
       id: roomId,
-      users: [{...user}],
+      users: [],
     });
     socket.broadcast.emit("roomCreated");
     socket.emit("roomCreatedSelf", roomId)
@@ -119,23 +121,35 @@ io.on("connection", (socket) => {
     const room = rooms.find((room) => room.id === roomId);
     if (room && room.users.length < 2) {
       socket.join(roomId);
+      console.log(user, roomId, "joined")
       room.users.push(user)
       socket.broadcast.emit("joinedRoom")
+      io.to(roomId).emit(`joinedRoom-${roomId}`, user)
     }
   });
+  socket.on("joinedRoom", ()=> {
+    console.log('basilio')
+  })
   console.log("a user connected");
   console.log("connections", io.engine.clientsCount);
 
   socket.on("disconnect", () => {
     const user = users.find((user) => user.socketIds?.has(socket.id));
-    if (user) removeUserAndDropRoom(user?.id);
+    if (user){
+     const roomId = removeUserAndDropRoom(user?.id);
+     io.to(roomId).emit(`disconnect-${roomId}`, user)
+    }
     console.log("user disconnected");
     socket.broadcast.emit("userDisconnected")
   });
 
   socket.on("exit", (userId: string) => {
     const user = users.find((user) => user.socketIds?.has(socket.id));
-    if (user) removeUserAndDropRoom(user?.id);
+    if (user) {
+      const roomId = removeUserAndDropRoom(user?.id);
+      io.to(roomId).emit(`disconnect-${roomId}`, user)
+      socket.leave(roomId);
+    }
     console.log("user exit");
     io.emit("userExit", userId)
   });
