@@ -6,6 +6,7 @@ import cors from "cors";
 import { createServer } from "http";
 import { name } from "../package.json";
 import { Server as ServerIo } from "socket.io";
+import {Pokemon} from "./pokemon.types"
 import * as R from "remeda";
 config();
 
@@ -14,15 +15,29 @@ type User = {
   name: string;
   email: string;
   image: string;
+  status: string;
+  pokemon?: Pokemon;
   socketIds?: Set<string>;
 };
-const userInRoom = (userId?: string) => {
+const users: User[] = [];
+const rooms = <{ id: string; users: User[] }[]>[];
+
+
+const userInRoom = (userId: string) => {
   return rooms.findIndex((room) =>
     room.users.find((user) => user.id === userId)
   );
 };
 
-const users: User[] = [];
+function getUser(userId: string) {
+  for (const room of rooms) {
+    const user = room.users.find(user => user.id === userId);
+    if (user) {
+      return user;
+    }
+  }
+  return undefined;
+}
 
 function removeUserAndDropRoom(userId: string): string {
   const index = R.pipe(
@@ -72,7 +87,6 @@ const io = new ServerIo(server, {
   },
 });
 
-const rooms = <{ id: string; users: User[] }[]>[];
 const port = process.env.PORT ?? 8000;
 server.listen(port, () => {
   /* eslint-disable no-console */
@@ -127,11 +141,29 @@ io.on("connection", (socket) => {
       io.to(roomId).emit(`joinedRoom-${roomId}`, user)
     }
   });
-  socket.on("joinedRoom", ()=> {
-    console.log('basilio')
-  })
+
   console.log("a user connected");
   console.log("connections", io.engine.clientsCount);
+
+  socket.on("playerReady", (user: User) => {
+    const userReference = getUser(user.id)
+    if (!userReference) return;
+    userReference.status = "ready"
+    const roomIndex = userInRoom(user.id)
+    if(rooms[roomIndex].users.every((user) => user.status === "ready")){
+      io.to(rooms[roomIndex].id).emit("allReady")
+    }
+  })
+  socket.on("pokemonChosen", (user: User, pokemon: Pokemon) => {
+    const userReference = getUser(user.id)
+    if (!userReference) return;
+    userReference.status = "chosen"
+    const roomIndex = userInRoom(user.id)
+    userReference.pokemon = pokemon
+    if(rooms[roomIndex].users.every((user) => user.status === "chosen")){
+      io.to(rooms[roomIndex].id).emit("allChosen")
+    }
+  })
 
   socket.on("disconnect", () => {
     const user = users.find((user) => user.socketIds?.has(socket.id));
