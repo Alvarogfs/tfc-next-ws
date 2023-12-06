@@ -3,6 +3,7 @@ import express from "express";
 import morgan from "morgan";
 import helmet from "helmet";
 import cors from "cors";
+import crypto from 'crypto'
 import { createServer } from "http";
 import { name } from "../package.json";
 import { Server as ServerIo } from "socket.io";
