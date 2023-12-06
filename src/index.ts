@@ -94,9 +94,11 @@ const stats = (pokemon: Pokemon) => {
 };
 
 function attackPerSec(speed: number): number {
-  return 1 / (speed / 150);
+  return 1 / (speed / 250);
 }
-
+const sleep = (ms: number) =>  {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 const app = express();
 app.use(morgan("dev"));
 app.use(helmet());
@@ -185,7 +187,7 @@ io.on("connection", (socket) => {
       io.to(rooms[roomIndex].id).emit("allReady");
     }
   });
-  socket.on("pokemonChosen", (user: User, pokemon: Pokemon) => {
+  socket.on("pokemonChosen", async (user: User, pokemon: Pokemon) => {
     const userReference = getUser(user.id);
     if (!userReference) return;
     userReference.status = "chosen";
@@ -203,12 +205,13 @@ io.on("connection", (socket) => {
         [player1?.id]: statsPlayer1,
         [player2?.id]: statsPlayer2,
       });
+      await sleep(1000)
       const player1Interval = setInterval(() => {
         const [player1, player2] = rooms[roomIndex].users;
         if(!player1?.id || !player2?.id) {
           clearInterval(player1Interval)
         }
-        console.log("Player 1 attack :3");
+        console.log("Player 1 attack");
         if (
           statsPlayer1.attack - statsPlayer2.defense >
           statsPlayer1.special_attack - statsPlayer2.special_defense
@@ -234,7 +237,7 @@ io.on("connection", (socket) => {
         if(!player1?.id || !player2?.id) {
           clearInterval(player2Interval)
         }
-        console.log("Player 2 attack ¬¬");
+        console.log("Player 2 attack");
         if (
           statsPlayer2.attack - statsPlayer1.defense >
           statsPlayer2.special_attack - statsPlayer1.special_defense
